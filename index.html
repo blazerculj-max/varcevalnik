@@ -1,0 +1,1131 @@
+<!doctype html>
+<html lang="sl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Kalkulator varčevanja: potrebno mesečno vplačilo za cilj, privarčevana vsota iz vložkov in mesečna izplačila.">
+<style>:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Varčevalnik</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: dva zavihka nad ploščo »vnosi | rezultat + graf«, pod njo plošča izplačil in opis izračuna. */
+:root {
+  --bg: #f2f5f3;
+  --surface: #fcfdfc;
+  --surface-2: #e9efec;
+  --ink: #10201b;
+  --ink-2: #46574f;
+  --muted: #6f807a;
+  --line: #d8e1dd;
+  --grid: #e3e9e6;
+  --base: #b9c6c0;
+  --track: #d3ddd9;
+  --accent: #0b6b58;
+  --accent-ink: #ffffff;
+  --accent-soft: #dcefe8;
+  --focus: #2f7fd3;
+  --shadow: rgba(16, 32, 27, 0.10);
+  --s-once: #00806a;
+  --s-monthly: #4b8fd8;
+  --s-yield: #dc9a12;
+
+  --font-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --step--1: 0.8125rem;
+  --step-0: 1rem;
+  --step-1: 1.1875rem;
+  --step-2: 1.5rem;
+  --step-3: clamp(1.75rem, 1.2rem + 2.2vw, 2.625rem);
+  --step-4: clamp(2.5rem, 1.6rem + 3.6vw, 3.75rem);
+  --radius: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0c1311;
+    --surface: #16201d;
+    --surface-2: #1e2a26;
+    --ink: #edf3f0;
+    --ink-2: #b4c3bd;
+    --muted: #84958e;
+    --line: #2a3833;
+    --grid: #24302c;
+    --base: #3a4a44;
+    --track: #2d3b36;
+    --accent: #3fbf9f;
+    --accent-ink: #05211a;
+    --accent-soft: #173a31;
+    --focus: #6aa8ee;
+    --shadow: rgba(0, 0, 0, 0.45);
+    --s-once: #17977c;
+    --s-monthly: #4d8fdc;
+    --s-yield: #c4860f;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0c1311;
+  --surface: #16201d;
+  --surface-2: #1e2a26;
+  --ink: #edf3f0;
+  --ink-2: #b4c3bd;
+  --muted: #84958e;
+  --line: #2a3833;
+  --grid: #24302c;
+  --base: #3a4a44;
+  --track: #2d3b36;
+  --accent: #3fbf9f;
+  --accent-ink: #05211a;
+  --accent-soft: #173a31;
+  --focus: #6aa8ee;
+  --shadow: rgba(0, 0, 0, 0.45);
+  --s-once: #17977c;
+  --s-monthly: #4d8fdc;
+  --s-yield: #c4860f;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--step-0);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap {
+  max-width: 1140px;
+  margin: 0 auto;
+  padding-inline: clamp(16px, 4vw, 36px);
+  padding-block: 20px 72px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; letter-spacing: -0.015em; }
+p { margin: 0; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* Glava */
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand svg { flex: none; }
+.brand-name { font-family: var(--font-display); font-weight: 700; font-size: var(--step-1); letter-spacing: -0.01em; }
+
+.intro { display: flex; flex-direction: column; gap: 10px; max-width: 46rem; padding-block: 8px 0; }
+.intro h1 { font-size: var(--step-3); font-weight: 700; line-height: 1.08; }
+.intro p { color: var(--ink-2); font-size: var(--step-1); max-width: 40rem; }
+
+/* Zavihki */
+.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.tab {
+  display: flex; flex-direction: column; gap: 4px; text-align: left;
+  padding: 16px 20px 18px; border-radius: var(--radius);
+  background: var(--surface); border: 1px solid var(--line); cursor: pointer;
+  transition: background-color .15s ease, border-color .15s ease;
+}
+.tab:hover { border-color: var(--accent); }
+.tab-title { font-family: var(--font-display); font-weight: 700; font-size: var(--step-1); line-height: 1.2; }
+.tab-sub { color: var(--ink-2); font-size: var(--step--1); }
+.tab[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.tab[aria-selected="true"] .tab-sub { color: var(--accent-ink); opacity: .85; }
+
+/* Plošča kalkulatorja */
+.panel {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+}
+.inputs { padding: 24px; display: flex; flex-direction: column; gap: 22px; border-right: 1px solid var(--line); min-width: 0; }
+.results { padding: 24px 24px 20px; display: flex; flex-direction: column; gap: 22px; min-width: 0; }
+
+/* Polja */
+.field { display: flex; flex-direction: column; gap: 8px; }
+.field-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.field label, .field .label { font-weight: 600; font-size: 0.9375rem; }
+.hint { color: var(--muted); font-size: var(--step--1); line-height: 1.4; }
+.input-box {
+  display: flex; align-items: center; gap: 6px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--bg);
+  padding-inline: 14px; transition: border-color .15s ease;
+}
+.input-box:focus-within { border-color: var(--accent); }
+.input-box input {
+  flex: 1; min-width: 0; border: 0; background: transparent; color: var(--ink);
+  font: 600 var(--step-1) / 1 var(--font-body); padding-block: 12px;
+  font-variant-numeric: tabular-nums; outline: none;
+}
+.input-box .unit { color: var(--muted); font-weight: 500; white-space: nowrap; }
+.input-box.sm { width: 8.5rem; padding-inline: 12px; }
+.input-box.sm input { font-size: var(--step-0); padding-block: 8px; text-align: right; }
+
+input[type="range"] {
+  -webkit-appearance: none; appearance: none; width: 100%; height: 26px; margin: 0;
+  background: transparent; cursor: pointer; --p: 50%;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px; border-radius: 3px;
+  background: linear-gradient(to right, var(--accent) var(--p), var(--track) var(--p));
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 22px; height: 22px; margin-top: -8px; border-radius: 50%;
+  background: var(--surface); border: 2px solid var(--accent); box-shadow: 0 1px 4px var(--shadow);
+}
+input[type="range"]::-moz-range-track { height: 6px; border-radius: 3px; background: var(--track); }
+input[type="range"]::-moz-range-progress { height: 6px; border-radius: 3px; background: var(--accent); }
+input[type="range"]::-moz-range-thumb {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--surface); border: 2px solid var(--accent); box-shadow: 0 1px 4px var(--shadow);
+}
+input[type="range"]:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; border-radius: 6px; }
+.scale { display: flex; justify-content: space-between; color: var(--muted); font-size: 0.75rem; margin-top: -4px; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  border: 1px solid var(--line); background: transparent; border-radius: 6px;
+  padding: 5px 10px; font-size: var(--step--1); cursor: pointer; color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.chip b { color: var(--ink); font-weight: 700; }
+.chip:hover { border-color: var(--accent); }
+.chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); }
+
+.segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }
+.segmented input { position: absolute; opacity: 0; pointer-events: none; }
+.segmented label {
+  text-align: center; padding: 9px 8px; border-radius: 7px; cursor: pointer;
+  font-weight: 600; font-size: 0.875rem; color: var(--ink-2); line-height: 1.25;
+}
+.segmented input:checked + label { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px var(--shadow); }
+.segmented input:focus-visible + label { outline: 2px solid var(--focus); outline-offset: 1px; }
+
+.link-btn {
+  align-self: flex-start; border: 0; background: none; padding: 0; cursor: pointer;
+  color: var(--accent); font-weight: 600; font-size: var(--step--1); text-decoration: underline; text-underline-offset: 3px;
+}
+
+/* Rezultat */
+.figure { display: flex; flex-direction: column; gap: 6px; }
+.figure-label { color: var(--ink-2); font-weight: 600; }
+.figure-value { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; }
+.figure-value strong {
+  font-family: var(--font-display); font-weight: 750; font-size: var(--step-4);
+  line-height: 1; letter-spacing: -0.03em; font-variation-settings: "opsz" 96;
+}
+.figure-value span { color: var(--ink-2); font-size: var(--step-1); }
+.figure-note { color: var(--ink-2); font-size: 0.9375rem; }
+
+.ledger { display: flex; flex-direction: column; font-variant-numeric: tabular-nums; }
+.ledger-row {
+  display: grid; grid-template-columns: 1.4em minmax(0, 1fr) auto; align-items: baseline; gap: 8px;
+  padding-block: 8px; border-bottom: 1px solid var(--grid);
+}
+.ledger-row .sign { color: var(--muted); font-weight: 600; text-align: center; }
+.ledger-row .name { color: var(--ink-2); }
+.ledger-row .val { font-weight: 600; text-align: right; }
+.ledger-row.total { border-top: 1px solid var(--ink); border-bottom: 3px double var(--ink); margin-top: -1px; }
+.ledger-row.total .name, .ledger-row.total .val { color: var(--ink); font-weight: 700; }
+.ledger-row.quiet .name, .ledger-row.quiet .val { color: var(--muted); font-weight: 500; }
+
+/* Graf */
+.chart-block { display: flex; flex-direction: column; gap: 10px; }
+.chart-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px 16px; flex-wrap: wrap; }
+.chart-head h3 { font-size: var(--step-0); font-weight: 700; letter-spacing: 0; font-family: var(--font-body); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; padding: 0; list-style: none; font-size: var(--step--1); color: var(--ink-2); }
+.legend li { display: flex; align-items: center; gap: 6px; }
+.sw { width: 10px; height: 10px; border-radius: 3px; flex: none; display: inline-block; }
+.chart-plot { position: relative; width: 100%; min-height: 220px; }
+.chart-plot svg { display: block; overflow: visible; }
+.chart-plot svg:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; border-radius: 6px; }
+.chart-plot text { font-family: var(--font-body); font-size: 12px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+.chart-plot .grid { stroke: var(--grid); stroke-width: 1; }
+.chart-plot .base { stroke: var(--base); stroke-width: 1; }
+.chart-plot .hl { fill: var(--surface-2); }
+.tip {
+  position: absolute; top: 6px; left: 0; z-index: 2; pointer-events: none;
+  min-width: 190px; padding: 10px 12px; border-radius: 10px;
+  background: var(--surface); border: 1px solid var(--line); box-shadow: 0 6px 18px var(--shadow);
+  font-size: var(--step--1); font-variant-numeric: tabular-nums;
+}
+.tip-title { font-weight: 700; margin-bottom: 6px; color: var(--ink); }
+.tip-row { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 8px; align-items: center; color: var(--ink-2); padding-block: 2px; }
+.tip-row b { color: var(--ink); font-weight: 600; }
+.tip-row.tip-total { border-top: 1px solid var(--grid); margin-top: 4px; padding-top: 6px; }
+.tip-row.tip-total b { font-weight: 700; }
+
+/* Sestava */
+.mix { display: flex; flex-direction: column; gap: 10px; }
+.mix h3 { font-size: var(--step-0); font-weight: 700; letter-spacing: 0; font-family: var(--font-body); }
+.mix-bar { display: flex; gap: 2px; height: 14px; }
+.mix-bar span { display: block; height: 100%; min-width: 2px; }
+.mix-bar span:first-child { border-radius: 4px 0 0 4px; }
+.mix-bar span:last-child { border-radius: 0 4px 4px 0; }
+.mix-bar span:only-child { border-radius: 4px; }
+.mix-legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px 16px; margin: 0; padding: 0; list-style: none; font-size: var(--step--1); }
+.mix-legend li { display: grid; grid-template-columns: 10px minmax(0, 1fr); gap: 2px 8px; align-items: center; }
+.mix-legend .n { color: var(--ink-2); }
+.mix-legend .v { grid-column: 2; font-weight: 600; font-variant-numeric: tabular-nums; }
+.mix-legend .v small { color: var(--muted); font-weight: 500; font-size: inherit; }
+
+/* Tabela */
+details.data summary {
+  cursor: pointer; color: var(--accent); font-weight: 600; font-size: var(--step--1);
+  width: fit-content; list-style-position: inside;
+}
+.table-scroll { overflow-x: auto; margin-top: 10px; max-height: 340px; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; }
+table { width: 100%; border-collapse: collapse; font-size: var(--step--1); font-variant-numeric: tabular-nums; }
+th, td { padding: 7px 12px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--grid); }
+th:first-child, td:first-child { text-align: left; }
+thead th { position: sticky; top: 0; background: var(--surface-2); color: var(--ink-2); font-weight: 600; }
+tbody tr:last-child td { border-bottom: 0; font-weight: 700; }
+
+/* Izplačila */
+.section-head { display: flex; flex-direction: column; gap: 6px; max-width: 44rem; }
+.section-head h2 { font-size: var(--step-2); font-weight: 700; }
+.section-head p { color: var(--ink-2); }
+
+/* Kako računamo */
+.method { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.method-item { display: flex; flex-direction: column; gap: 6px; padding: 16px 18px; border-top: 2px solid var(--line); }
+.method-item h3 { font-family: var(--font-body); font-size: 0.9375rem; font-weight: 700; letter-spacing: 0; }
+.method-item p { color: var(--ink-2); font-size: 0.9375rem; }
+.method-item code {
+  font-family: var(--font-mono); font-size: 0.8125rem; color: var(--ink);
+  background: var(--surface-2); padding: 6px 8px; border-radius: 6px; display: block; overflow-x: auto; white-space: nowrap;
+}
+
+footer.disclaimer { color: var(--muted); font-size: var(--step--1); max-width: 52rem; border-top: 1px solid var(--line); padding-top: 18px; }
+
+@media (max-width: 900px) {
+  .panel { grid-template-columns: minmax(0, 1fr); }
+  .inputs { border-right: 0; border-bottom: 1px solid var(--line); }
+}
+@media (max-width: 620px) {
+  .tabs { grid-template-columns: minmax(0, 1fr); }
+  .inputs, .results { padding: 18px 16px; }
+  .input-box.sm { width: 7.5rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="brand" aria-label="Varčevalnik">
+    <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true">
+      <rect x="2" y="17" width="7" height="11" rx="2" style="fill: var(--s-once)"></rect>
+      <rect x="11.5" y="10" width="7" height="18" rx="2" style="fill: var(--s-monthly)"></rect>
+      <rect x="21" y="2" width="7" height="26" rx="2" style="fill: var(--s-yield)"></rect>
+    </svg>
+    <span class="brand-name">Varčevalnik</span>
+  </header>
+
+  <section class="intro">
+    <h1>Koliko bo zraslo vaše varčevanje?</h1>
+    <p>Začnite pri cilju ali pri znesku, ki ga lahko namenite varčevanju. Spodaj nato izračunate še, koliko lahko mesečno izplačujete.</p>
+  </section>
+
+  <div class="tabs" role="tablist" aria-label="Vrsta izračuna">
+    <button class="tab" role="tab" id="tab-cilj" aria-controls="panel-cilj" aria-selected="true" data-tab="cilj">
+      <span class="tab-title">Koliko želim privarčevati?</span>
+      <span class="tab-sub">Vpišete cilj, izračunamo potrebno mesečno vplačilo.</span>
+    </button>
+    <button class="tab" role="tab" id="tab-vlozek" aria-controls="panel-vlozek" aria-selected="false" tabindex="-1" data-tab="vlozek">
+      <span class="tab-title">Koliko lahko namenim varčevanju?</span>
+      <span class="tab-sub">Vpišete vložek in mesečni znesek, izračunamo končno vsoto.</span>
+    </button>
+  </div>
+
+  <!-- Zavihek 1 -->
+  <section class="panel" id="panel-cilj" role="tabpanel" aria-labelledby="tab-cilj">
+    <div class="inputs">
+      <div class="field">
+        <label for="c-goal">Želena privarčevana vsota</label>
+        <div class="input-box"><input id="c-goal" inputmode="decimal" autocomplete="off"><span class="unit">€</span></div>
+      </div>
+      <div class="field">
+        <label for="c-start">Začetni vložek</label>
+        <div class="input-box"><input id="c-start" inputmode="decimal" autocomplete="off"><span class="unit">€</span></div>
+        <p class="hint">Neobvezno. Znesek, ki ga vložite takoj na začetku.</p>
+      </div>
+      <div class="field">
+        <div class="field-head">
+          <label for="c-years">Doba varčevanja</label>
+          <div class="input-box sm"><input id="c-years" inputmode="numeric" autocomplete="off"><span class="unit">let</span></div>
+        </div>
+        <input type="range" id="c-years-r" min="1" max="50" step="1" aria-label="Doba varčevanja, drsnik">
+        <div class="scale"><span>1 leto</span><span>50 let</span></div>
+      </div>
+      <div class="field">
+        <div class="field-head">
+          <label for="c-rate">Predvidena letna donosnost</label>
+          <div class="input-box sm"><input id="c-rate" inputmode="decimal" autocomplete="off"><span class="unit">%</span></div>
+        </div>
+        <input type="range" id="c-rate-r" min="0" max="15" step="0.5" aria-label="Predvidena letna donosnost, drsnik">
+        <div class="scale"><span>0 %</span><span>15 %</span></div>
+        <div class="chips" data-for="c-rate"></div>
+        <p class="hint" id="c-double"></p>
+      </div>
+      <div class="field">
+        <div class="field-head">
+          <label for="c-cost">Vstopni stroški</label>
+          <div class="input-box sm"><input id="c-cost" inputmode="decimal" autocomplete="off"><span class="unit">%</span></div>
+        </div>
+        <input type="range" id="c-cost-r" min="0" max="5" step="0.1" aria-label="Vstopni stroški, drsnik">
+        <p class="hint">Odstotek, ki se odšteje od vsakega vplačila, preden se naloži.</p>
+      </div>
+    </div>
+
+    <div class="results">
+      <div class="figure">
+        <span class="figure-label">Potrebno mesečno vplačilo</span>
+        <div class="figure-value"><strong id="c-figure">0 €</strong><span>na mesec</span></div>
+        <p class="figure-note" id="c-note"></p>
+      </div>
+      <div class="ledger" id="c-ledger"></div>
+      <div class="chart-block">
+        <div class="chart-head"><h3>Vrednost naložbe po letih</h3><ul class="legend" id="c-legend"></ul></div>
+        <div class="chart-plot" id="c-chart"></div>
+        <details class="data"><summary>Podatki po letih</summary><div class="table-scroll"><table id="c-table"></table></div></details>
+      </div>
+      <div class="mix" id="c-mix"></div>
+    </div>
+  </section>
+
+  <!-- Zavihek 2 -->
+  <section class="panel" id="panel-vlozek" role="tabpanel" aria-labelledby="tab-vlozek" hidden>
+    <div class="inputs">
+      <div class="field">
+        <label for="v-start">Enkratni vložek</label>
+        <div class="input-box"><input id="v-start" inputmode="decimal" autocomplete="off"><span class="unit">€</span></div>
+      </div>
+      <div class="field">
+        <label for="v-monthly">Mesečni znesek varčevanja</label>
+        <div class="input-box"><input id="v-monthly" inputmode="decimal" autocomplete="off"><span class="unit">€</span></div>
+      </div>
+      <div class="field">
+        <div class="field-head">
+          <label for="v-years">Doba varčevanja</label>
+          <div class="input-box sm"><input id="v-years" inputmode="numeric" autocomplete="off"><span class="unit">let</span></div>
+        </div>
+        <input type="range" id="v-years-r" min="1" max="50" step="1" aria-label="Doba varčevanja, drsnik">
+        <div class="scale"><span>1 leto</span><span>50 let</span></div>
+      </div>
+      <div class="field">
+        <div class="field-head">
+          <label for="v-rate">Pričakovana letna donosnost</label>
+          <div class="input-box sm"><input id="v-rate" inputmode="decimal" autocomplete="off"><span class="unit">%</span></div>
+        </div>
+        <input type="range" id="v-rate-r" min="0" max="15" step="0.5" aria-label="Pričakovana letna donosnost, drsnik">
+        <div class="scale"><span>0 %</span><span>15 %</span></div>
+        <div class="chips" data-for="v-rate"></div>
+        <p class="hint" id="v-double"></p>
+      </div>
+      <div class="field">
+        <div class="field-head">
+          <label for="v-cost">Vstopni stroški</label>
+          <div class="input-box sm"><input id="v-cost" inputmode="decimal" autocomplete="off"><span class="unit">%</span></div>
+        </div>
+        <input type="range" id="v-cost-r" min="0" max="5" step="0.1" aria-label="Vstopni stroški, drsnik">
+        <p class="hint">Odstotek, ki se odšteje od vsakega vplačila, preden se naloži.</p>
+      </div>
+    </div>
+
+    <div class="results">
+      <div class="figure">
+        <span class="figure-label" id="v-figure-label">Privarčevana sredstva</span>
+        <div class="figure-value"><strong id="v-figure">0 €</strong></div>
+        <p class="figure-note" id="v-note"></p>
+      </div>
+      <div class="ledger" id="v-ledger"></div>
+      <div class="chart-block">
+        <div class="chart-head"><h3>Vrednost naložbe po letih</h3><ul class="legend" id="v-legend"></ul></div>
+        <div class="chart-plot" id="v-chart"></div>
+        <details class="data"><summary>Podatki po letih</summary><div class="table-scroll"><table id="v-table"></table></div></details>
+      </div>
+      <div class="mix" id="v-mix"></div>
+    </div>
+  </section>
+
+  <!-- Izplačila -->
+  <div class="section-head">
+    <h2>Mesečna izplačila</h2>
+    <p>Kaj se zgodi, ko začnete privarčevana sredstva porabljati. Znesek se prenese iz izračuna zgoraj, lahko pa ga spremenite.</p>
+  </div>
+  <section class="panel" id="panel-izplacila" aria-label="Izračun mesečnih izplačil">
+    <div class="inputs">
+      <div class="field">
+        <label for="p-amount">Privarčevana sredstva</label>
+        <div class="input-box"><input id="p-amount" inputmode="decimal" autocomplete="off"><span class="unit">€</span></div>
+        <button type="button" class="link-btn" id="p-relink" hidden></button>
+      </div>
+      <div class="field">
+        <span class="label" id="p-mode-label">Način porabe sredstev</span>
+        <div class="segmented" role="radiogroup" aria-labelledby="p-mode-label">
+          <input type="radio" name="p-mode" id="p-mode-all" value="all" checked><label for="p-mode-all">Izplačam vsa sredstva</label>
+          <input type="radio" name="p-mode" id="p-mode-yield" value="yield"><label for="p-mode-yield">Izplačam samo donose</label>
+        </div>
+        <p class="hint" id="p-mode-hint"></p>
+      </div>
+      <div class="field">
+        <div class="field-head">
+          <label for="p-years">Čas izplačevanja</label>
+          <div class="input-box sm"><input id="p-years" inputmode="numeric" autocomplete="off"><span class="unit">let</span></div>
+        </div>
+        <input type="range" id="p-years-r" min="1" max="40" step="1" aria-label="Čas izplačevanja, drsnik">
+        <div class="scale"><span>1 leto</span><span>40 let</span></div>
+      </div>
+      <div class="field">
+        <div class="field-head">
+          <label for="p-rate">Letna donosnost med izplačevanjem</label>
+          <div class="input-box sm"><input id="p-rate" inputmode="decimal" autocomplete="off"><span class="unit">%</span></div>
+        </div>
+        <input type="range" id="p-rate-r" min="0" max="15" step="0.5" aria-label="Letna donosnost med izplačevanjem, drsnik">
+        <div class="scale"><span>0 %</span><span>15 %</span></div>
+        <div class="chips" data-for="p-rate"></div>
+      </div>
+    </div>
+
+    <div class="results">
+      <div class="figure">
+        <span class="figure-label">Mesečno izplačilo</span>
+        <div class="figure-value"><strong id="p-figure">0 €</strong><span>na mesec</span></div>
+        <p class="figure-note" id="p-note"></p>
+      </div>
+      <div class="ledger" id="p-ledger"></div>
+      <div class="chart-block">
+        <div class="chart-head"><h3>Stanje in izplačila po letih</h3><ul class="legend" id="p-legend"></ul></div>
+        <div class="chart-plot" id="p-chart"></div>
+        <details class="data"><summary>Podatki po letih</summary><div class="table-scroll"><table id="p-table"></table></div></details>
+      </div>
+    </div>
+  </section>
+
+  <!-- Kako računamo -->
+  <div class="section-head">
+    <h2>Kako računamo</h2>
+    <p>Vsi izračuni uporabljajo isto mesečno donosnost in iste predpostavke, zato se rezultati med zavihki ujemajo.</p>
+  </div>
+  <section class="method">
+    <div class="method-item">
+      <h3>Mesečna donosnost</h3>
+      <p>Letno donosnost r pretvorimo v mesečno tako, da dvanajst mesecev skupaj da natanko izbrano letno donosnost.</p>
+      <code>i = (1 + r)^(1/12) − 1</code>
+    </div>
+    <div class="method-item">
+      <h3>Privarčevana sredstva</h3>
+      <p>Mesečno vplačilo M se vloži na začetku vsakega meseca. V je enkratni vložek, n število mesecev.</p>
+      <code>FV = V·(1+i)^n + M·((1+i)^n − 1)/i·(1+i)</code>
+    </div>
+    <div class="method-item">
+      <h3>Potrebno mesečno vplačilo</h3>
+      <p>Za cilj C izračunamo, koliko mora biti M, da po n mesecih dosežete C. Začetni vložek cilj zmanjša.</p>
+      <code>M = (C − V·(1+i)^n)·i / (((1+i)^n − 1)·(1+i))</code>
+    </div>
+    <div class="method-item">
+      <h3>Mesečno izplačilo</h3>
+      <p>Pri porabi vseh sredstev A se izplačilo P zgodi na koncu vsakega meseca. Pri izplačilu samo donosov je P = A·i.</p>
+      <code>P = A·i / (1 − (1+i)^−n)</code>
+    </div>
+    <div class="method-item">
+      <h3>Vstopni stroški</h3>
+      <p>Odštejemo jih od vsakega vplačila, preden se naloži. Grafi in sestava kažejo vložena sredstva po stroških.</p>
+    </div>
+    <div class="method-item">
+      <h3>Česa ne upoštevamo</h3>
+      <p>Davkov, inflacije, letnih stroškov upravljanja in nihanj na trgu. Donosnost je ves čas enaka.</p>
+    </div>
+  </section>
+
+  <footer class="disclaimer">
+    Izračun je informativen in ni naložbeni nasvet. Donosnost naložb se spreminja in ni zagotovljena, pretekla donosnost pa ne napoveduje prihodnje. Pred odločitvijo preberite dokumente izbranega sklada.
+  </footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ---------- Oblikovanje števil ----------
+  const nf0 = new Intl.NumberFormat('sl-SI', { maximumFractionDigits: 0 });
+  const nf1 = new Intl.NumberFormat('sl-SI', { maximumFractionDigits: 1 });
+  const nf2 = new Intl.NumberFormat('sl-SI', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const NB = ' ';
+  // Pika za tisočice tudi pri štirimestnih zneskih (Intl jih za sl-SI ne loči).
+  function group(v, dec) {
+    const r = Math.round(v * Math.pow(10, dec)) / Math.pow(10, dec);
+    const parts = Math.abs(r).toFixed(dec).split('.');
+    const int = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return (r < 0 ? '−' : '') + int + (parts[1] ? ',' + parts[1] : '');
+  }
+  const eur0 = (v) => group(v, 0) + NB + '€';
+  const eur2 = (v) => group(v, 2) + NB + '€';
+  const pct = (v) => nf1.format(v) + NB + '%';
+
+  function letPlural(n) {
+    const m = Math.abs(Math.round(n)) % 100;
+    if (m === 1) return 'leto';
+    if (m === 2) return 'leti';
+    if (m === 3 || m === 4) return 'leta';
+    return 'let';
+  }
+  function letLocative(n) { return Math.round(n) === 1 ? 'letu' : 'letih'; }
+
+  function parseNum(str) {
+    let s = String(str == null ? '' : str).trim().replace(/[\s €%]/g, '');
+    if (!s) return NaN;
+    const hasC = s.includes(','), hasD = s.includes('.');
+    if (hasC && hasD) {
+      s = s.lastIndexOf(',') > s.lastIndexOf('.') ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+    } else if (hasC) {
+      s = s.replace(',', '.');
+    } else if (hasD) {
+      const parts = s.split('.');
+      if (parts.length > 2 || (parts.length === 2 && parts[1].length === 3)) s = parts.join('');
+    }
+    return /^-?\d*\.?\d+$/.test(s) ? Number(s) : NaN;
+  }
+  const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+
+  // ---------- Izračuni ----------
+  const monthlyRate = (ratePct) => Math.pow(1 + ratePct / 100, 1 / 12) - 1;
+
+  // Varčevanje: vplačila na začetku meseca, vstopni stroški se odštejejo od vsakega vplačila.
+  function computeSaving(start, monthly, ratePct, years, costPct) {
+    const i = monthlyRate(ratePct);
+    const k = 1 - costPct / 100;
+    const pv = start * k, pm = monthly * k;
+    const rows = [];
+    for (let y = 0; y <= years; y++) {
+      const m = y * 12;
+      const g = Math.pow(1 + i, m);
+      const valOnce = pv * g;
+      const valMonthly = m === 0 ? 0 : (i === 0 ? pm * m : pm * ((g - 1) / i) * (1 + i));
+      const netMonthly = pm * m;
+      const total = valOnce + valMonthly;
+      rows.push({ year: y, values: [pv, netMonthly, Math.max(total - pv - netMonthly, 0)], total });
+    }
+    const n = years * 12;
+    const gross = start + monthly * n;
+    const net = pv + pm * n;
+    const final = rows[rows.length - 1].total;
+    return { rows, final, gross, net, costs: gross - net, yield: final - net };
+  }
+
+  // Cilj: koliko mesečno, da po n mesecih dosežemo želeno vsoto.
+  function computeGoal(goal, start, ratePct, years, costPct) {
+    const i = monthlyRate(ratePct);
+    const k = 1 - costPct / 100;
+    const n = years * 12;
+    const g = Math.pow(1 + i, n);
+    const rest = goal - start * k * g;
+    let pm = 0;
+    if (rest > 0) pm = i === 0 ? rest / n : (rest * i) / ((g - 1) * (1 + i));
+    const monthly = pm / k;
+    const s = computeSaving(start, monthly, ratePct, years, costPct);
+    return Object.assign(s, { monthly, reached: rest <= 0 });
+  }
+
+  // Izplačila: izplačilo na koncu meseca.
+  function computePayout(amount, ratePct, years, mode) {
+    const i = monthlyRate(ratePct);
+    const n = years * 12;
+    let P = mode === 'yield' ? amount * i : (i === 0 ? amount / n : (amount * i) / (1 - Math.pow(1 + i, -n)));
+    P = Math.round(P * 100) / 100;
+    const rows = [];
+    for (let y = 0; y <= years; y++) {
+      const m = y * 12;
+      let bal;
+      if (mode === 'yield') {
+        bal = amount;
+      } else {
+        const g = Math.pow(1 + i, m);
+        bal = i === 0 ? amount - P * m : amount * g - P * ((g - 1) / i);
+        bal = y === years ? 0 : Math.max(bal, 0);
+      }
+      rows.push({ year: y, values: [bal, P * m], total: bal + P * m });
+    }
+    const paid = P * n;
+    return { P, rows, paid, yield: mode === 'yield' ? paid : paid - amount, remain: mode === 'yield' ? amount : 0 };
+  }
+
+  // ---------- Graf (zložljivi stolpci v SVG) ----------
+  const SVGNS = 'http://www.w3.org/2000/svg';
+  function svgEl(tag, attrs, parent) {
+    const e = document.createElementNS(SVGNS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function niceStep(raw) {
+    if (raw <= 0) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(raw)));
+    const f = raw / p;
+    return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p;
+  }
+  function axisFormatter(top) {
+    if (top >= 1e6) return (v) => (v === 0 ? '0' : nf1.format(v / 1e6) + ' mio') + ' €';
+    if (top >= 1e4) return (v) => (v === 0 ? '0' : nf1.format(v / 1e3) + ' tis.') + ' €';
+    return (v) => group(v, 0) + ' €';
+  }
+  function topRounded(x, y, w, h, r) {
+    r = Math.max(0, Math.min(r, w / 2, h));
+    return 'M' + x + ',' + (y + h) + 'V' + (y + r) + 'A' + r + ',' + r + ' 0 0 1 ' + (x + r) + ',' + y +
+      'H' + (x + w - r) + 'A' + r + ',' + r + ' 0 0 1 ' + (x + w) + ',' + (y + r) + 'V' + (y + h) + 'Z';
+  }
+  function sampleRows(rows) {
+    if (rows.length <= 31) return rows;
+    const step = Math.ceil((rows.length - 1) / 25);
+    const out = rows.filter((r) => r.year % step === 0);
+    if (out[out.length - 1] !== rows[rows.length - 1]) out.push(rows[rows.length - 1]);
+    return out;
+  }
+
+  function makeChart(plot) {
+    const tip = document.createElement('div');
+    tip.className = 'tip';
+    tip.hidden = true;
+    tip.setAttribute('aria-live', 'polite');
+    let data = null, geo = null, svg = null, hl = null, active = -1;
+
+    function draw() {
+      if (!data) return;
+      const W = Math.floor(plot.clientWidth);
+      if (!W) return;
+      const H = W < 520 ? 220 : 260;
+      const cols = data.rows;
+      const totals = cols.map((c) => c.values.reduce((a, b) => a + Math.max(b, 0), 0));
+      const maxT = Math.max.apply(null, totals.concat([100]));
+      const step = niceStep(maxT / 4);
+      const top = Math.ceil(maxT / step - 1e-9) * step;
+      const fmtY = axisFormatter(top);
+      const ticks = [];
+      for (let v = 0; v <= top + step * 1e-6; v += step) ticks.push(v);
+      const labelW = Math.max.apply(null, ticks.map((t) => fmtY(t).length)) * 6.6 + 10;
+      const m = { l: Math.ceil(labelW), r: 4, t: 10, b: 28 };
+      const pw = W - m.l - m.r, ph = H - m.t - m.b;
+      const y = (v) => m.t + ph - (v / top) * ph;
+      const n = cols.length;
+      const band = pw / n;
+      const bw = Math.max(3, Math.min(24, band * 0.62));
+
+      plot.textContent = '';
+      svg = svgEl('svg', { width: W, height: H, viewBox: '0 0 ' + W + ' ' + H, role: 'img', tabindex: '0', 'aria-label': data.summary || '' }, plot);
+      plot.appendChild(tip);
+
+      ticks.forEach((t) => {
+        const yy = Math.round(y(t)) + 0.5;
+        svgEl('line', { x1: m.l, x2: W - m.r, y1: yy, y2: yy, class: t === 0 ? 'base' : 'grid' }, svg);
+        const tx = svgEl('text', { x: m.l - 8, y: yy + 4, 'text-anchor': 'end' }, svg);
+        tx.textContent = fmtY(t);
+      });
+
+      hl = svgEl('rect', { x: 0, y: m.t, width: band, height: ph, class: 'hl', rx: 4, visibility: 'hidden' }, svg);
+
+      cols.forEach((c, idx) => {
+        const cx = m.l + band * (idx + 0.5);
+        const x = cx - bw / 2;
+        let acc = 0;
+        const segs = c.values.map((v, si) => ({ v: Math.max(v, 0), si })).filter((s) => s.v > 0);
+        segs.forEach((s, k) => {
+          const y0 = y(acc), y1 = y(acc + s.v);
+          acc += s.v;
+          const isTop = k === segs.length - 1;
+          let yTop = y1, h = y0 - y1;
+          if (!isTop) { yTop += 2; h -= 2; }
+          if (h < 0.5) return;
+          const p = svgEl('path', { d: isTop ? topRounded(x, yTop, bw, h, 4) : 'M' + x + ',' + yTop + 'h' + bw + 'v' + h + 'h' + (-bw) + 'Z' }, svg);
+          p.style.fill = 'var(' + data.series[s.si].color + ')';
+        });
+      });
+
+      // Oznake na osi x: dovolj razmika, prvo in zadnje vedno.
+      const every = Math.max(1, Math.ceil(n / Math.max(1, Math.floor(pw / 62))));
+      cols.forEach((c, idx) => {
+        const last = idx === n - 1;
+        const show = idx === 0 || last || (idx % every === 0 && (n - 1 - idx) >= every * 0.7);
+        if (!show) return;
+        const cx = m.l + band * (idx + 0.5);
+        let anchor = 'middle';
+        if (idx === 0 && band < 40) anchor = 'start';
+        if (last && band < 40) anchor = 'end';
+        const ax = anchor === 'start' ? cx - bw / 2 : anchor === 'end' ? cx + bw / 2 : cx;
+        const tx = svgEl('text', { x: ax, y: H - 8, 'text-anchor': anchor }, svg);
+        tx.textContent = data.xLabel(c.year);
+      });
+
+      geo = { m, band, W, y, totals, n };
+
+      svg.addEventListener('pointermove', onPointer);
+      svg.addEventListener('pointerdown', onPointer);
+      svg.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') setActive(-1); });
+      svg.addEventListener('focus', () => { if (active < 0) setActive(n - 1); });
+      svg.addEventListener('blur', () => setActive(-1));
+      svg.addEventListener('keydown', onKey);
+      if (active >= n) active = -1;
+      if (active >= 0) setActive(active);
+    }
+
+    function onPointer(e) {
+      const r = svg.getBoundingClientRect();
+      const x = e.clientX - r.left;
+      const idx = Math.floor((x - geo.m.l) / geo.band);
+      setActive(idx >= 0 && idx < geo.n ? idx : -1);
+    }
+    function onKey(e) {
+      if (!geo) return;
+      let idx = active < 0 ? geo.n - 1 : active;
+      if (e.key === 'ArrowRight') idx = Math.min(geo.n - 1, idx + 1);
+      else if (e.key === 'ArrowLeft') idx = Math.max(0, idx - 1);
+      else if (e.key === 'Home') idx = 0;
+      else if (e.key === 'End') idx = geo.n - 1;
+      else if (e.key === 'Escape') { setActive(-1); return; }
+      else return;
+      e.preventDefault();
+      setActive(idx);
+    }
+    function setActive(idx) {
+      active = idx;
+      if (!geo || !hl) return;
+      if (idx < 0) { hl.setAttribute('visibility', 'hidden'); tip.hidden = true; return; }
+      const c = data.rows[idx];
+      hl.setAttribute('x', geo.m.l + geo.band * idx);
+      hl.setAttribute('width', geo.band);
+      hl.setAttribute('visibility', 'visible');
+      let html = '<div class="tip-title">' + data.tipTitle(c.year) + '</div>';
+      data.series.forEach((s, si) => {
+        if (data.visible && !data.visible.includes(si)) return;
+        html += '<div class="tip-row"><span class="sw" style="background: var(' + s.color + ')"></span><span>' + s.name + '</span><b>' + eur0(c.values[si]) + '</b></div>';
+      });
+      html += '<div class="tip-row tip-total"><span></span><span>' + (data.totalLabel || 'Skupaj') + '</span><b>' + eur0(c.total) + '</b></div>';
+      tip.innerHTML = html;
+      tip.hidden = false;
+      const cx = geo.m.l + geo.band * (idx + 0.5);
+      const tw = tip.offsetWidth;
+      let left = cx + 14;
+      if (left + tw > geo.W) left = cx - 14 - tw;
+      tip.style.left = clamp(left, 0, Math.max(0, geo.W - tw)) + 'px';
+    }
+
+    if ('ResizeObserver' in window) new ResizeObserver(() => draw()).observe(plot);
+    else window.addEventListener('resize', draw);
+
+    return { update(d) { data = d; draw(); } };
+  }
+
+  // ---------- Pomožni izrisi ----------
+  function visibleSeries(rows, count) {
+    const out = [];
+    for (let si = 0; si < count; si++) if (rows.some((r) => r.values[si] > 0.005)) out.push(si);
+    return out.length ? out : [0];
+  }
+  function renderLegend(ul, series, visible) {
+    ul.innerHTML = visible.map((si) => '<li><span class="sw" style="background: var(' + series[si].color + ')"></span>' + series[si].name + '</li>').join('');
+  }
+  function renderTable(table, rows, series, visible, firstCol, yearLabel, totalLabel) {
+    let h = '<thead><tr><th scope="col">' + firstCol + '</th>';
+    visible.forEach((si) => { h += '<th scope="col">' + series[si].name + '</th>'; });
+    h += '<th scope="col">' + totalLabel + '</th></tr></thead><tbody>';
+    rows.forEach((r) => {
+      h += '<tr><td>' + yearLabel(r.year) + '</td>';
+      visible.forEach((si) => { h += '<td>' + eur0(r.values[si]) + '</td>'; });
+      h += '<td>' + eur0(r.total) + '</td></tr>';
+    });
+    table.innerHTML = h + '</tbody>';
+  }
+  function renderLedger(div, rows) {
+    div.innerHTML = rows.map((r) =>
+      '<div class="ledger-row' + (r.cls ? ' ' + r.cls : '') + '"><span class="sign" aria-hidden="true">' + (r.sign || '') +
+      '</span><span class="name">' + r.name + '</span><span class="val">' + r.val + '</span></div>').join('');
+  }
+  function renderMix(div, parts, total) {
+    const live = parts.filter((p) => p.v > 0.005);
+    const sum = live.reduce((a, p) => a + p.v, 0) || 1;
+    let h = '<h3>Sestava končnega zneska</h3><div class="mix-bar" role="img" aria-label="' +
+      live.map((p) => p.name + ' ' + nf0.format(Math.round((p.v / sum) * 100)) + ' %').join(', ') + '">';
+    live.forEach((p) => { h += '<span style="flex: ' + p.v / sum + ' 1 0; background: var(' + p.color + ')"></span>'; });
+    h += '</div><ul class="mix-legend">';
+    live.forEach((p) => {
+      h += '<li><span class="sw" style="background: var(' + p.color + ')"></span><span class="n">' + p.name +
+        '</span><span class="v">' + eur0(p.v) + ' <small>· ' + nf0.format(Math.round((p.v / sum) * 100)) + ' %</small></span></li>';
+    });
+    div.innerHTML = h + '</ul>';
+  }
+  function doublingText(rate) {
+    if (rate <= 0) return 'Brez donosa se vložena sredstva ne povečajo.';
+    const t = Math.log(2) / Math.log(1 + rate / 100);
+    const r = Math.round(t);
+    return 'Pri ' + pct(rate) + ' se vložena sredstva podvojijo v približno ' + nf0.format(r) + ' ' + letLocative(r) + '.';
+  }
+  const yearLabelSave = (y) => (y === 0 ? 'Danes' : y + '. leto');
+  const tipTitleSave = (y) => (y === 0 ? 'Danes' : 'Konec ' + y + '. leta');
+  const yearLabelPay = (y) => (y === 0 ? 'Začetek' : y + '. leto');
+  const tipTitlePay = (y) => (y === 0 ? 'Začetek izplačevanja' : 'Konec ' + y + '. leta');
+
+  // ---------- Polja ----------
+  const onChangeHandlers = [];
+  function makeField(id, opts) {
+    const input = document.getElementById(id);
+    const range = document.getElementById(id + '-r');
+    const unitEl = input.parentElement.querySelector('.unit');
+    const fmt = new Intl.NumberFormat('sl-SI', { maximumFractionDigits: opts.decimals });
+    const f = {
+      value: opts.value,
+      set(v, from) {
+        v = clamp(v, opts.min, opts.max);
+        const p = Math.pow(10, opts.decimals);
+        v = Math.round(v * p) / p;
+        f.value = v;
+        if (from !== 'input') input.value = opts.decimals === 0 ? group(v, 0) : fmt.format(v);
+        if (range) {
+          if (from !== 'range') range.value = v;
+          const lo = Number(range.min), hi = Number(range.max);
+          range.style.setProperty('--p', (hi > lo ? ((clamp(v, lo, hi) - lo) / (hi - lo)) * 100 : 0) + '%');
+        }
+        if (unitEl && opts.unit) unitEl.textContent = opts.unit(v);
+      },
+    };
+    const changed = () => { if (opts.onUser) opts.onUser(); update(); };
+    input.addEventListener('input', () => {
+      const v = parseNum(input.value);
+      if (Number.isFinite(v)) { f.set(v, 'input'); changed(); }
+    });
+    input.addEventListener('change', () => {
+      const v = parseNum(input.value);
+      f.set(Number.isFinite(v) ? v : f.value);
+      changed();
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { input.blur(); return; }
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        const st = (opts.step || 1) * (e.shiftKey ? 10 : 1);
+        f.set(f.value + (e.key === 'ArrowUp' ? st : -st));
+        changed();
+      }
+    });
+    if (range) range.addEventListener('input', () => { f.set(Number(range.value), 'range'); changed(); });
+    f.set(opts.value);
+    return f;
+  }
+
+  const years = (v) => letPlural(v);
+  const F = {
+    cGoal: makeField('c-goal', { value: 10000, min: 0, max: 100000000, decimals: 0, step: 1000 }),
+    cStart: makeField('c-start', { value: 0, min: 0, max: 100000000, decimals: 0, step: 1000 }),
+    cYears: makeField('c-years', { value: 10, min: 1, max: 50, decimals: 0, step: 1, unit: years }),
+    cRate: makeField('c-rate', { value: 5, min: 0, max: 15, decimals: 2, step: 0.5 }),
+    cCost: makeField('c-cost', { value: 0, min: 0, max: 5, decimals: 2, step: 0.1 }),
+    vStart: makeField('v-start', { value: 10000, min: 0, max: 100000000, decimals: 0, step: 1000 }),
+    vMonthly: makeField('v-monthly', { value: 100, min: 0, max: 10000000, decimals: 0, step: 10 }),
+    vYears: makeField('v-years', { value: 10, min: 1, max: 50, decimals: 0, step: 1, unit: years }),
+    vRate: makeField('v-rate', { value: 5, min: 0, max: 15, decimals: 2, step: 0.5 }),
+    vCost: makeField('v-cost', { value: 0, min: 0, max: 5, decimals: 2, step: 0.1 }),
+    pAmount: makeField('p-amount', { value: 10000, min: 0, max: 100000000, decimals: 0, step: 1000, onUser: () => { state.linked = false; } }),
+    pYears: makeField('p-years', { value: 10, min: 1, max: 40, decimals: 0, step: 1, unit: years }),
+    pRate: makeField('p-rate', { value: 5, min: 0, max: 15, decimals: 2, step: 0.5 }),
+  };
+  const fieldById = { 'c-rate': F.cRate, 'v-rate': F.vRate, 'p-rate': F.pRate };
+
+  const PRESETS = [
+    { rate: 3, name: 'obvezniški', title: 'Primer za sklad z manjšim tveganjem' },
+    { rate: 5, name: 'mešani', title: 'Primer za sklad s srednjim tveganjem' },
+    { rate: 7, name: 'delniški', title: 'Primer za sklad z višjim tveganjem' },
+  ];
+  document.querySelectorAll('.chips').forEach((box) => {
+    const field = fieldById[box.dataset.for];
+    box.innerHTML = PRESETS.map((p) => '<button type="button" class="chip" data-rate="' + p.rate + '" title="' + p.title + '" aria-pressed="false"><b>' + p.rate + ' %</b> · ' + p.name + '</button>').join('');
+    box.addEventListener('click', (e) => {
+      const b = e.target.closest('.chip');
+      if (!b) return;
+      field.set(Number(b.dataset.rate));
+      update();
+    });
+  });
+
+  const state = { tab: 'cilj', linked: true, mode: 'all', source: 0 };
+
+  // ---------- Zavihki ----------
+  const tabs = Array.from(document.querySelectorAll('.tab'));
+  function selectTab(name, focus) {
+    state.tab = name;
+    tabs.forEach((t) => {
+      const on = t.dataset.tab === name;
+      t.setAttribute('aria-selected', String(on));
+      t.tabIndex = on ? 0 : -1;
+      document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+      if (on && focus) t.focus();
+    });
+    try { history.replaceState(null, '', '#' + name); } catch (e) { /* okvir lahko to zavrne */ }
+    update();
+  }
+  tabs.forEach((t, idx) => {
+    t.addEventListener('click', () => selectTab(t.dataset.tab));
+    t.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+      e.preventDefault();
+      const next = tabs[(idx + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
+      selectTab(next.dataset.tab, true);
+    });
+  });
+
+  document.querySelectorAll('input[name="p-mode"]').forEach((r) => {
+    r.addEventListener('change', () => { state.mode = r.value; update(); });
+  });
+  const relink = document.getElementById('p-relink');
+  relink.addEventListener('click', () => { state.linked = true; update(); });
+
+  // ---------- Izris ----------
+  const charts = {
+    c: makeChart(document.getElementById('c-chart')),
+    v: makeChart(document.getElementById('v-chart')),
+    p: makeChart(document.getElementById('p-chart')),
+  };
+  const $ = (id) => document.getElementById(id);
+
+  function renderSavingPanel(prefix, r, opts) {
+    const series = [
+      { name: opts.onceName, color: '--s-once' },
+      { name: 'Mesečna vplačila', color: '--s-monthly' },
+      { name: 'Donos', color: '--s-yield' },
+    ];
+    const visible = visibleSeries(r.rows, 3);
+    renderLedger($(prefix + '-ledger'), [
+      { name: 'Vsota vplačil', val: eur0(r.gross) },
+      { sign: '−', name: 'Vstopni stroški', val: eur0(r.costs), cls: r.costs > 0.005 ? '' : 'quiet' },
+      { sign: '+', name: 'Predviden donos', val: eur0(r.yield) },
+      { sign: '=', name: 'Privarčevano ob koncu', val: eur0(r.final), cls: 'total' },
+    ]);
+    renderLegend($(prefix + '-legend'), series, visible);
+    const last = r.rows[r.rows.length - 1];
+    charts[prefix].update({
+      rows: sampleRows(r.rows),
+      series, visible,
+      xLabel: yearLabelSave, tipTitle: tipTitleSave, totalLabel: 'Vrednost',
+      summary: 'Vrednost naložbe raste od ' + eur0(r.rows[0].total) + ' danes do ' + eur0(last.total) + ' na koncu ' + last.year + '. leta.',
+    });
+    renderTable($(prefix + '-table'), r.rows, series, visible, 'Leto', yearLabelSave, 'Vrednost');
+    renderMix($(prefix + '-mix'), [
+      { name: opts.onceName, v: last.values[0], color: '--s-once' },
+      { name: 'Mesečna vplačila', v: last.values[1], color: '--s-monthly' },
+      { name: 'Donos', v: last.values[2], color: '--s-yield' },
+    ], last.total);
+  }
+
+  function update() {
+    // Zavihek 1
+    const yc = F.cYears.value;
+    const rc = computeGoal(F.cGoal.value, F.cStart.value, F.cRate.value, yc, F.cCost.value);
+    $('c-figure').textContent = eur2(rc.monthly);
+    $('c-note').textContent = F.cGoal.value <= 0
+      ? 'Vpišite želeno privarčevano vsoto.'
+      : rc.reached
+      ? 'Cilj dosežete že z začetnim vložkom, mesečna vplačila niso potrebna.'
+      : 'Toliko vplačujete ' + nf0.format(yc) + ' ' + letPlural(yc) + ', da dosežete ' + eur0(F.cGoal.value) + '.';
+    $('c-double').textContent = doublingText(F.cRate.value);
+    renderSavingPanel('c', rc, { onceName: 'Začetni vložek' });
+
+    // Zavihek 2
+    const yv = F.vYears.value;
+    const rv = computeSaving(F.vStart.value, F.vMonthly.value, F.vRate.value, yv, F.vCost.value);
+    $('v-figure-label').textContent = 'Privarčevana sredstva po ' + nf0.format(yv) + ' ' + letLocative(yv);
+    $('v-figure').textContent = eur0(rv.final);
+    $('v-note').textContent = rv.gross > 0
+      ? 'Za vsak vplačan evro dobite ob koncu približno ' + nf2.format(rv.final / rv.gross) + NB + '€.'
+      : 'Vpišite enkratni vložek ali mesečni znesek.';
+    $('v-double').textContent = doublingText(F.vRate.value);
+    renderSavingPanel('v', rv, { onceName: 'Enkratni vložek' });
+
+    // Izplačila
+    state.source = Math.round(state.tab === 'cilj' ? rc.final : rv.final);
+    if (state.linked) F.pAmount.set(state.source);
+    relink.hidden = state.linked || F.pAmount.value === state.source;
+    relink.textContent = 'Uporabi znesek iz izračuna (' + eur0(state.source) + ')';
+    if (!relink.hidden) relink.setAttribute('aria-label', relink.textContent);
+
+    const A = F.pAmount.value, yp = F.pYears.value, mode = state.mode;
+    const rp = computePayout(A, F.pRate.value, yp, mode);
+    $('p-figure').textContent = eur2(rp.P);
+    $('p-mode-hint').textContent = mode === 'yield'
+      ? 'Izplačujete le donos, glavnica ostane na računu.'
+      : 'Izplačujete glavnico in donos, ob koncu je račun prazen.';
+    if (mode === 'yield') {
+      $('p-note').textContent = rp.P > 0
+        ? 'Glavnica ' + eur0(A) + ' ostane nedotaknjena, izplačila lahko trajajo poljubno dolgo.'
+        : 'Brez donosa ni česa izplačevati, če želite ohraniti glavnico.';
+      renderLedger($('p-ledger'), [
+        { name: 'Skupaj izplačani donosi v ' + nf0.format(yp) + ' ' + letLocative(yp), val: eur0(rp.paid) },
+        { name: 'Ostane na računu', val: eur0(rp.remain), cls: 'total' },
+      ]);
+    } else {
+      $('p-note').textContent = 'Sredstva zadoščajo za ' + nf0.format(yp * 12) + ' mesečnih izplačil.';
+      renderLedger($('p-ledger'), [
+        { name: 'Privarčevana sredstva', val: eur0(A) },
+        { sign: '+', name: 'Donos med izplačevanjem', val: eur0(rp.yield) },
+        { sign: '=', name: 'Skupaj izplačano', val: eur0(rp.paid), cls: 'total' },
+      ]);
+    }
+    const pSeries = [
+      { name: 'Stanje na računu', color: '--s-once' },
+      { name: 'Skupaj izplačano', color: '--s-monthly' },
+    ];
+    const pVisible = visibleSeries(rp.rows, 2);
+    renderLegend($('p-legend'), pSeries, pVisible);
+    charts.p.update({
+      rows: sampleRows(rp.rows), series: pSeries, visible: pVisible,
+      xLabel: yearLabelPay, tipTitle: tipTitlePay, totalLabel: 'Skupaj',
+      summary: 'Mesečno izplačilo ' + eur2(rp.P) + ' skozi ' + yp + ' ' + letPlural(yp) + '; skupaj izplačano ' + eur0(rp.paid) + '.',
+    });
+    renderTable($('p-table'), rp.rows, pSeries, pVisible, 'Leto', yearLabelPay, 'Skupaj');
+
+    // Stanje gumbov za donosnost
+    document.querySelectorAll('.chips').forEach((box) => {
+      const v = fieldById[box.dataset.for].value;
+      box.querySelectorAll('.chip').forEach((c) => c.setAttribute('aria-pressed', String(Number(c.dataset.rate) === v)));
+    });
+
+    save();
+  }
+
+  // ---------- Shranjevanje vnosov (samo v tem brskalniku) ----------
+  const KEY = 'varcevalnik-v1';
+  let ready = false;
+  function save() {
+    if (!ready) return;
+    try {
+      const vals = {};
+      for (const k in F) vals[k] = F[k].value;
+      localStorage.setItem(KEY, JSON.stringify({ vals, tab: state.tab, linked: state.linked, mode: state.mode }));
+    } catch (e) { /* shramba ni na voljo */ }
+  }
+  function load() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch (e) { return null; }
+  }
+
+  const saved = load();
+  if (saved && saved.vals) {
+    for (const k in F) if (Number.isFinite(saved.vals[k])) F[k].set(saved.vals[k]);
+    if (typeof saved.linked === 'boolean') state.linked = saved.linked;
+    if (saved.mode === 'yield' || saved.mode === 'all') {
+      state.mode = saved.mode;
+      document.getElementById('p-mode-' + saved.mode).checked = true;
+    }
+  }
+  let startTab = saved && (saved.tab === 'vlozek' || saved.tab === 'cilj') ? saved.tab : 'cilj';
+  const hash = (location.hash || '').slice(1);
+  if (hash === 'vlozek' || hash === 'cilj') startTab = hash;
+  ready = true;
+  selectTab(startTab);
+})();
+</script>
+
+</body>
+</html>
