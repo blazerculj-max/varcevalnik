@@ -202,6 +202,13 @@ input[type="range"]:focus-visible { outline: 2px solid var(--focus); outline-off
 .segmented input:checked + label { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px var(--shadow); }
 .segmented input:focus-visible + label { outline: 2px solid var(--focus); outline-offset: 1px; }
 
+.check { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.check input { width: 18px; height: 18px; margin: 0; flex: none; accent-color: var(--accent); cursor: pointer; }
+.units-body { display: flex; flex-direction: column; gap: 12px; padding-left: 28px; }
+.pair { display: flex; flex-wrap: wrap; gap: 12px 16px; }
+.pair .field { gap: 6px; }
+.pair label { font-weight: 500; font-size: var(--step--1); color: var(--ink-2); }
+
 .link-btn {
   align-self: flex-start; border: 0; background: none; padding: 0; cursor: pointer;
   color: var(--accent); font-weight: 600; font-size: var(--step--1); text-decoration: underline; text-underline-offset: 3px;
@@ -378,6 +385,27 @@ footer.disclaimer { color: var(--muted); font-size: var(--step--1); max-width: 5
         <input type="range" id="c-cost-r" min="0" max="5" step="0.1" aria-label="Vstopni stroški, drsnik">
         <p class="hint">Odstotek, ki se odšteje od vsakega vplačila, preden se naloži.</p>
       </div>
+      <div class="field">
+        <label class="check" for="c-units-on"><input type="checkbox" id="c-units-on"><span>Upoštevaj stroške začetnih enot</span></label>
+        <div class="units-body" id="c-units-body" hidden>
+          <span class="label" id="c-units-count-label">Začetne enote so kupljene s prvimi</span>
+          <div class="segmented" role="radiogroup" aria-labelledby="c-units-count-label">
+            <input type="radio" name="c-units-count" id="c-units-24" value="24" checked><label for="c-units-24">24 vplačili</label>
+            <input type="radio" name="c-units-count" id="c-units-30" value="30"><label for="c-units-30">30 vplačili</label>
+          </div>
+          <div class="pair">
+            <div class="field">
+              <label for="c-urate">Mesečni strošek</label>
+              <div class="input-box sm"><input id="c-urate" inputmode="decimal" autocomplete="off"><span class="unit">%</span></div>
+            </div>
+            <div class="field">
+              <label for="c-uyears">Obračun v prvih</label>
+              <div class="input-box sm"><input id="c-uyears" inputmode="numeric" autocomplete="off"><span class="unit">letih</span></div>
+            </div>
+          </div>
+          <p class="hint" id="c-units-hint"></p>
+        </div>
+      </div>
     </div>
 
     <div class="results">
@@ -432,6 +460,27 @@ footer.disclaimer { color: var(--muted); font-size: var(--step--1); max-width: 5
         </div>
         <input type="range" id="v-cost-r" min="0" max="5" step="0.1" aria-label="Vstopni stroški, drsnik">
         <p class="hint">Odstotek, ki se odšteje od vsakega vplačila, preden se naloži.</p>
+      </div>
+      <div class="field">
+        <label class="check" for="v-units-on"><input type="checkbox" id="v-units-on"><span>Upoštevaj stroške začetnih enot</span></label>
+        <div class="units-body" id="v-units-body" hidden>
+          <span class="label" id="v-units-count-label">Začetne enote so kupljene s prvimi</span>
+          <div class="segmented" role="radiogroup" aria-labelledby="v-units-count-label">
+            <input type="radio" name="v-units-count" id="v-units-24" value="24" checked><label for="v-units-24">24 vplačili</label>
+            <input type="radio" name="v-units-count" id="v-units-30" value="30"><label for="v-units-30">30 vplačili</label>
+          </div>
+          <div class="pair">
+            <div class="field">
+              <label for="v-urate">Mesečni strošek</label>
+              <div class="input-box sm"><input id="v-urate" inputmode="decimal" autocomplete="off"><span class="unit">%</span></div>
+            </div>
+            <div class="field">
+              <label for="v-uyears">Obračun v prvih</label>
+              <div class="input-box sm"><input id="v-uyears" inputmode="numeric" autocomplete="off"><span class="unit">letih</span></div>
+            </div>
+          </div>
+          <p class="hint" id="v-units-hint"></p>
+        </div>
       </div>
     </div>
 
@@ -536,6 +585,10 @@ footer.disclaimer { color: var(--muted); font-size: var(--step--1); max-width: 5
       <p>Odštejemo jih od vsakega vplačila, preden se naloži. Grafi in sestava kažejo vložena sredstva po stroških.</p>
     </div>
     <div class="method-item">
+      <h3>Stroški začetnih enot</h3>
+      <p>Enote, kupljene s prvimi 24 ali 30 mesečnimi vplačili, so začetne enote. Od njihove vrednosti se v obdobju obračuna (privzeto prvih 10 let) na koncu vsakega meseca odšteje izbrani odstotek, privzeto 0,49 %. Enkratni vložek ni del začetnih enot. Ko je strošek vklopljen, računamo mesec za mesecem.</p>
+    </div>
+    <div class="method-item">
       <h3>Česa ne upoštevamo</h3>
       <p>Davkov, inflacije, letnih stroškov upravljanja in nihanj na trgu. Donosnost je ves čas enaka.</p>
     </div>
@@ -594,39 +647,54 @@ footer.disclaimer { color: var(--muted); font-size: var(--step--1); max-width: 5
   // ---------- Izračuni ----------
   const monthlyRate = (ratePct) => Math.pow(1 + ratePct / 100, 1 / 12) - 1;
 
-  // Varčevanje: vplačila na začetku meseca, vstopni stroški se odštejejo od vsakega vplačila.
-  function computeSaving(start, monthly, ratePct, years, costPct) {
+  // Varčevanje mesec za mesecem: vplačilo na začetku meseca (po vstopnih stroških), nato donos.
+  // Stroški začetnih enot: enote iz prvih N mesečnih vplačil; od njihove vrednosti se na koncu
+  // vsakega meseca v obdobju obračuna odšteje mesečni odstotek.
+  function computeSaving(start, monthly, ratePct, years, costPct, units) {
     const i = monthlyRate(ratePct);
     const k = 1 - costPct / 100;
     const pv = start * k, pm = monthly * k;
-    const rows = [];
-    for (let y = 0; y <= years; y++) {
-      const m = y * 12;
-      const g = Math.pow(1 + i, m);
-      const valOnce = pv * g;
-      const valMonthly = m === 0 ? 0 : (i === 0 ? pm * m : pm * ((g - 1) / i) * (1 + i));
-      const netMonthly = pm * m;
-      const total = valOnce + valMonthly;
-      rows.push({ year: y, values: [pv, netMonthly, Math.max(total - pv - netMonthly, 0)], total });
-    }
     const n = years * 12;
+    const uCount = units ? units.count : 0;
+    const uRate = units ? units.rate / 100 : 0;
+    const uMonths = units ? units.years * 12 : 0;
+    let other = pv, initial = 0, charged = 0;
+    const row = (y) => {
+      const total = other + initial;
+      const netMonthly = pm * y * 12;
+      return { year: y, values: [pv, Math.max(netMonthly - charged, 0), Math.max(total - pv - netMonthly + charged, 0)], total };
+    };
+    const rows = [row(0)];
+    for (let t = 1; t <= n; t++) {
+      if (t <= uCount) initial += pm; else other += pm;
+      other *= 1 + i;
+      initial *= 1 + i;
+      if (t <= uMonths && initial > 0) {
+        const c = initial * uRate;
+        initial -= c;
+        charged += c;
+      }
+      if (t % 12 === 0) rows.push(row(t / 12));
+    }
     const gross = start + monthly * n;
     const net = pv + pm * n;
-    const final = rows[rows.length - 1].total;
-    return { rows, final, gross, net, costs: gross - net, yield: final - net };
+    const final = other + initial;
+    return {
+      rows, final, gross, net,
+      costs: gross - net,
+      unitCosts: charged,
+      unitPayments: Math.min(uCount, n),
+      yield: final - net + charged,
+    };
   }
 
-  // Cilj: koliko mesečno, da po n mesecih dosežemo želeno vsoto.
-  function computeGoal(goal, start, ratePct, years, costPct) {
-    const i = monthlyRate(ratePct);
-    const k = 1 - costPct / 100;
-    const n = years * 12;
-    const g = Math.pow(1 + i, n);
-    const rest = goal - start * k * g;
-    let pm = 0;
-    if (rest > 0) pm = i === 0 ? rest / n : (rest * i) / ((g - 1) * (1 + i));
-    const monthly = pm / k;
-    const s = computeSaving(start, monthly, ratePct, years, costPct);
+  // Cilj: končna vrednost je linearna v mesečnem vplačilu, zato M = (C − vrednost brez vplačil) / vrednost na 1 €.
+  function computeGoal(goal, start, ratePct, years, costPct, units) {
+    const base = computeSaving(start, 0, ratePct, years, costPct, units).final;
+    const perEuro = computeSaving(0, 1, ratePct, years, costPct, units).final;
+    const rest = goal - base;
+    const monthly = rest > 0 && perEuro > 0 ? rest / perEuro : 0;
+    const s = computeSaving(start, monthly, ratePct, years, costPct, units);
     return Object.assign(s, { monthly, reached: rest <= 0 });
   }
 
@@ -925,6 +993,10 @@ footer.disclaimer { color: var(--muted); font-size: var(--step--1); max-width: 5
     vYears: makeField('v-years', { value: 10, min: 1, max: 50, decimals: 0, step: 1, unit: years }),
     vRate: makeField('v-rate', { value: 5, min: 0, max: 15, decimals: 2, step: 0.5 }),
     vCost: makeField('v-cost', { value: 0, min: 0, max: 5, decimals: 2, step: 0.1 }),
+    cURate: makeField('c-urate', { value: 0.49, min: 0, max: 5, decimals: 2, step: 0.01 }),
+    cUYears: makeField('c-uyears', { value: 10, min: 1, max: 50, decimals: 0, step: 1, unit: (v) => letLocative(v) }),
+    vURate: makeField('v-urate', { value: 0.49, min: 0, max: 5, decimals: 2, step: 0.01 }),
+    vUYears: makeField('v-uyears', { value: 10, min: 1, max: 50, decimals: 0, step: 1, unit: (v) => letLocative(v) }),
     pAmount: makeField('p-amount', { value: 10000, min: 0, max: 100000000, decimals: 0, step: 1000, onUser: () => { state.linked = false; } }),
     pYears: makeField('p-years', { value: 10, min: 1, max: 40, decimals: 0, step: 1, unit: years }),
     pRate: makeField('p-rate', { value: 5, min: 0, max: 15, decimals: 2, step: 0.5 }),
@@ -947,7 +1019,17 @@ footer.disclaimer { color: var(--muted); font-size: var(--step--1); max-width: 5
     });
   });
 
-  const state = { tab: 'cilj', linked: true, mode: 'all', source: 0 };
+  const state = {
+    tab: 'cilj', linked: true, mode: 'all', source: 0,
+    units: { c: { on: false, count: 24 }, v: { on: false, count: 24 } },
+  };
+  ['c', 'v'].forEach((p) => {
+    const box = document.getElementById(p + '-units-on');
+    box.addEventListener('change', () => { state.units[p].on = box.checked; update(); });
+    document.querySelectorAll('input[name="' + p + '-units-count"]').forEach((r) => {
+      r.addEventListener('change', () => { state.units[p].count = Number(r.value); update(); });
+    });
+  });
 
   // ---------- Zavihki ----------
   const tabs = Array.from(document.querySelectorAll('.tab'));
@@ -994,12 +1076,16 @@ footer.disclaimer { color: var(--muted); font-size: var(--step--1); max-width: 5
       { name: 'Donos', color: '--s-yield' },
     ];
     const visible = visibleSeries(r.rows, 3);
-    renderLedger($(prefix + '-ledger'), [
+    const ledger = [
       { name: 'Vsota vplačil', val: eur0(r.gross) },
       { sign: '−', name: 'Vstopni stroški', val: eur0(r.costs), cls: r.costs > 0.005 ? '' : 'quiet' },
+    ];
+    if (opts.units) ledger.push({ sign: '−', name: 'Stroški začetnih enot', val: eur0(r.unitCosts) });
+    ledger.push(
       { sign: '+', name: 'Predviden donos', val: eur0(r.yield) },
-      { sign: '=', name: 'Privarčevano ob koncu', val: eur0(r.final), cls: 'total' },
-    ]);
+      { sign: '=', name: 'Privarčevano ob koncu', val: eur0(r.final), cls: 'total' }
+    );
+    renderLedger($(prefix + '-ledger'), ledger);
     renderLegend($(prefix + '-legend'), series, visible);
     const last = r.rows[r.rows.length - 1];
     charts[prefix].update({
@@ -1016,10 +1102,28 @@ footer.disclaimer { color: var(--muted); font-size: var(--step--1); max-width: 5
     ], last.total);
   }
 
+  const nfRate = new Intl.NumberFormat('sl-SI', { maximumFractionDigits: 2 });
+  function unitsFor(p) {
+    const u = state.units[p];
+    $(p + '-units-body').hidden = !u.on;
+    if (!u.on) return null;
+    return { count: u.count, rate: F[p + 'URate'].value, years: F[p + 'UYears'].value };
+  }
+  function renderUnitsHint(p, u, r, monthly, savingYears) {
+    if (!u) return;
+    const made = r.unitPayments;
+    let t = 'Začetne enote: ' + made + ' × ' + eur2(monthly) + ' = ' + eur0(made * monthly) + '. Od njihove vrednosti se ' +
+      (u.years === 1 ? 'v prvem letu' : 'v prvih ' + u.years + ' letih') + ' vsak mesec odšteje ' + nfRate.format(u.rate) + NB + '%.';
+    if (savingYears * 12 < u.count) t += ' Varčujete manj kot ' + u.count + ' mesecev, zato so začetne enote vsa mesečna vplačila.';
+    if (u.years > savingYears) t += ' Obračun se konča z iztekom varčevanja.';
+    $(p + '-units-hint').textContent = t;
+  }
+
   function update() {
     // Zavihek 1
     const yc = F.cYears.value;
-    const rc = computeGoal(F.cGoal.value, F.cStart.value, F.cRate.value, yc, F.cCost.value);
+    const uc = unitsFor('c');
+    const rc = computeGoal(F.cGoal.value, F.cStart.value, F.cRate.value, yc, F.cCost.value, uc);
     $('c-figure').textContent = eur2(rc.monthly);
     $('c-note').textContent = F.cGoal.value <= 0
       ? 'Vpišite želeno privarčevano vsoto.'
@@ -1027,18 +1131,21 @@ footer.disclaimer { color: var(--muted); font-size: var(--step--1); max-width: 5
       ? 'Cilj dosežete že z začetnim vložkom, mesečna vplačila niso potrebna.'
       : 'Toliko vplačujete ' + nf0.format(yc) + ' ' + letPlural(yc) + ', da dosežete ' + eur0(F.cGoal.value) + '.';
     $('c-double').textContent = doublingText(F.cRate.value);
-    renderSavingPanel('c', rc, { onceName: 'Začetni vložek' });
+    renderUnitsHint('c', uc, rc, rc.monthly, yc);
+    renderSavingPanel('c', rc, { onceName: 'Začetni vložek', units: uc });
 
     // Zavihek 2
     const yv = F.vYears.value;
-    const rv = computeSaving(F.vStart.value, F.vMonthly.value, F.vRate.value, yv, F.vCost.value);
+    const uv = unitsFor('v');
+    const rv = computeSaving(F.vStart.value, F.vMonthly.value, F.vRate.value, yv, F.vCost.value, uv);
     $('v-figure-label').textContent = 'Privarčevana sredstva po ' + nf0.format(yv) + ' ' + letLocative(yv);
     $('v-figure').textContent = eur0(rv.final);
     $('v-note').textContent = rv.gross > 0
       ? 'Za vsak vplačan evro dobite ob koncu približno ' + nf2.format(rv.final / rv.gross) + NB + '€.'
       : 'Vpišite enkratni vložek ali mesečni znesek.';
     $('v-double').textContent = doublingText(F.vRate.value);
-    renderSavingPanel('v', rv, { onceName: 'Enkratni vložek' });
+    renderUnitsHint('v', uv, rv, F.vMonthly.value, yv);
+    renderSavingPanel('v', rv, { onceName: 'Enkratni vložek', units: uv });
 
     // Izplačila
     state.source = Math.round(state.tab === 'cilj' ? rc.final : rv.final);
@@ -1099,7 +1206,7 @@ footer.disclaimer { color: var(--muted); font-size: var(--step--1); max-width: 5
     try {
       const vals = {};
       for (const k in F) vals[k] = F[k].value;
-      localStorage.setItem(KEY, JSON.stringify({ vals, tab: state.tab, linked: state.linked, mode: state.mode }));
+      localStorage.setItem(KEY, JSON.stringify({ vals, tab: state.tab, linked: state.linked, mode: state.mode, units: state.units }));
     } catch (e) { /* shramba ni na voljo */ }
   }
   function load() {
@@ -1118,6 +1225,14 @@ footer.disclaimer { color: var(--muted); font-size: var(--step--1); max-width: 5
       state.mode = saved.mode;
       document.getElementById('p-mode-' + saved.mode).checked = true;
     }
+    if (saved.units) ['c', 'v'].forEach((p) => {
+      const u = saved.units[p];
+      if (!u) return;
+      state.units[p].on = !!u.on;
+      if (u.count === 24 || u.count === 30) state.units[p].count = u.count;
+      document.getElementById(p + '-units-on').checked = state.units[p].on;
+      document.getElementById(p + '-units-' + state.units[p].count).checked = true;
+    });
   }
   let startTab = saved && (saved.tab === 'vlozek' || saved.tab === 'cilj') ? saved.tab : 'cilj';
   const hash = (location.hash || '').slice(1);
