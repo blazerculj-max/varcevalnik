@@ -306,9 +306,45 @@ tbody tr:last-child td { border-bottom: 0; font-weight: 700; }
 
 footer.disclaimer { color: var(--muted); font-size: var(--step--1); max-width: 52rem; border-top: 1px solid var(--line); padding-top: 18px; }
 
+/* Pritrjen rezultat */
+.dock {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+  padding: 10px clamp(16px, 4vw, 36px) calc(10px + env(safe-area-inset-bottom, 0px));
+  background: var(--surface); border-top: 1px solid var(--line); box-shadow: 0 -6px 18px var(--shadow);
+}
+.dock-inner { max-width: 1140px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.dock-text { display: flex; flex-direction: column; min-width: 0; }
+.dock-label { color: var(--ink-2); font-size: var(--step--1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dock-value { font-family: var(--font-display); font-weight: 750; font-size: var(--step-2); line-height: 1.1; letter-spacing: -0.02em; white-space: nowrap; }
+.dock-btn {
+  flex: none; min-height: 44px; padding: 0 16px; border: 1px solid var(--accent); border-radius: 10px;
+  background: var(--accent); color: var(--accent-ink); font-weight: 600; cursor: pointer;
+}
+
+@media (min-width: 901px) {
+  .dock { display: none !important; }
+}
 @media (max-width: 900px) {
   .panel { grid-template-columns: minmax(0, 1fr); }
   .inputs { border-right: 0; border-bottom: 1px solid var(--line); }
+  .wrap { padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* Večje tarče za prst na zaslonih na dotik */
+@media (pointer: coarse), (max-width: 620px) {
+  .chips { gap: 8px; }
+  .chip { min-height: 44px; padding: 8px 14px; font-size: 0.875rem; }
+  .check { min-height: 44px; }
+  .check input { width: 24px; height: 24px; }
+  .units-body { padding-left: 34px; }
+  .segmented label { min-height: 44px; display: flex; align-items: center; justify-content: center; padding: 8px; }
+  .input-box.sm input { padding-block: 12px; }
+  input[type="range"] { height: 44px; }
+  input[type="range"]::-webkit-slider-thumb { width: 28px; height: 28px; margin-top: -11px; }
+  input[type="range"]::-moz-range-thumb { width: 24px; height: 24px; }
+  .link-btn { min-height: 44px; }
+  details.data summary { padding-block: 12px; }
+  .scale { margin-top: -8px; }
 }
 @media (max-width: 620px) {
   .tabs { grid-template-columns: minmax(0, 1fr); }
@@ -597,6 +633,17 @@ footer.disclaimer { color: var(--muted); font-size: var(--step--1); max-width: 5
   <footer class="disclaimer">
     Izračun je informativen in ni naložbeni nasvet. Donosnost naložb se spreminja in ni zagotovljena, pretekla donosnost pa ne napoveduje prihodnje. Pred odločitvijo preberite dokumente izbranega sklada.
   </footer>
+</div>
+
+<!-- Pritrjen rezultat na ožjih zaslonih, dokler je pravi rezultat izven pogleda -->
+<div class="dock" id="dock" hidden>
+  <div class="dock-inner">
+    <div class="dock-text">
+      <span class="dock-label" id="dock-label"></span>
+      <strong class="dock-value" id="dock-value"></strong>
+    </div>
+    <button type="button" class="dock-btn" id="dock-btn">Podrobnosti</button>
+  </div>
 </div>
 
 <script>
@@ -1102,6 +1149,51 @@ footer.disclaimer { color: var(--muted); font-size: var(--step--1); max-width: 5
     ], last.total);
   }
 
+  // ---------- Pritrjen rezultat (ožji zasloni) ----------
+  // Pokaže rezultat razdelka, katerega vnosi so na zaslonu, dokler njegov rezultat ni viden.
+  const dock = $('dock');
+  const dockSections = [
+    { panel: $('panel-cilj'), label: () => 'Potrebno mesečno vplačilo', value: () => $('c-figure').textContent + ' / mesec' },
+    { panel: $('panel-vlozek'), label: () => $('v-figure-label').textContent, value: () => $('v-figure').textContent },
+    { panel: $('panel-izplacila'), label: () => 'Mesečno izplačilo', value: () => $('p-figure').textContent + ' / mesec' },
+  ];
+  const seen = new Map();
+  let dockCurrent = null;
+  function updateDock() {
+    let best = null, bestH = 0;
+    dockSections.forEach((s) => {
+      if (s.panel.hidden) return;
+      const h = seen.get(s.inputs) || 0;
+      if (h > bestH) { best = s; bestH = h; }
+    });
+    const show = !!best && bestH > 60 && !(seen.get(best.figure) > 0);
+    dock.hidden = !show;
+    dockCurrent = show ? best : null;
+    if (show) {
+      $('dock-label').textContent = best.label();
+      $('dock-value').textContent = best.value();
+    }
+  }
+  if ('IntersectionObserver' in window) {
+    const thresholds = [];
+    for (let t = 0; t <= 1.0001; t += 0.05) thresholds.push(Math.min(t, 1));
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => seen.set(e.target, e.isIntersecting ? e.intersectionRect.height : 0));
+      updateDock();
+    }, { threshold: thresholds });
+    dockSections.forEach((s) => {
+      s.inputs = s.panel.querySelector('.inputs');
+      s.figure = s.panel.querySelector('.figure');
+      io.observe(s.inputs);
+      io.observe(s.figure);
+    });
+  }
+  $('dock-btn').addEventListener('click', () => {
+    if (!dockCurrent) return;
+    const smooth = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    dockCurrent.figure.scrollIntoView({ block: 'center', behavior: smooth ? 'smooth' : 'auto' });
+  });
+
   const nfRate = new Intl.NumberFormat('sl-SI', { maximumFractionDigits: 2 });
   function unitsFor(p) {
     const u = state.units[p];
@@ -1195,6 +1287,7 @@ footer.disclaimer { color: var(--muted); font-size: var(--step--1); max-width: 5
       box.querySelectorAll('.chip').forEach((c) => c.setAttribute('aria-pressed', String(Number(c.dataset.rate) === v)));
     });
 
+    updateDock();
     save();
   }
 
